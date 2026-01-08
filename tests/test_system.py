@@ -2,7 +2,7 @@ import unittest
 from PyQt6.QtWidgets import QApplication
 from src.core.mqtt_manager import MqttManager
 from src.gui.main_window import MainWindow
-from plugins.wavemeter.wavemeter_plugin import WavemeterPlugin
+from plugins.wavemeter_plugin import WavemeterPlugin
 import time
 
 class TestWavemeterSystem(unittest.TestCase):
@@ -31,20 +31,26 @@ class TestWavemeterSystem(unittest.TestCase):
     def test_wavemeter_update(self):
         plugin = WavemeterPlugin(num_channels=4)
 
-        # Simulate receiving a message
+        # Simulate receiving a message in the expected format
+        # Topic: HFWM/8731/frequency/1
+        # Payload: "(timestamp, frequency)"
         test_freq = 123.456
-        plugin.handle_message("instruments/wavemeter/channel/1/frequency", str(test_freq))
+        timestamp = 1000.0
+        topic = "HFWM/8731/frequency/1"
+        payload = f"({timestamp}, {test_freq})"
+
+        plugin.handle_message(topic, payload)
 
         # Check if the label updated
         label_text = plugin.channels[1].freq_label.text()
         self.assertEqual(label_text, f"{test_freq:.6f} THz")
 
         # Test invalid channel
-        plugin.handle_message("instruments/wavemeter/channel/99/frequency", "100.0")
+        plugin.handle_message("HFWM/8731/frequency/99", "(1, 100.0)")
         # Should not crash
 
         # Test invalid payload
-        plugin.handle_message("instruments/wavemeter/channel/1/frequency", "invalid")
+        plugin.handle_message("HFWM/8731/frequency/1", "invalid")
         # Should not crash, label should remain same
         self.assertEqual(plugin.channels[1].freq_label.text(), f"{test_freq:.6f} THz")
 

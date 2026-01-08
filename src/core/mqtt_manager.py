@@ -1,6 +1,5 @@
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 import paho.mqtt.client as mqtt
-import json
 
 class MqttManager(QThread):
     """
@@ -32,6 +31,7 @@ class MqttManager(QThread):
             # Resubscribe if we have pending subscriptions
             for topic in self.subscriptions:
                 self.client.subscribe(topic)
+                print(f"Subscribed to: {topic}")
         else:
             print(f"Failed to connect, return code {rc}")
 
@@ -51,6 +51,7 @@ class MqttManager(QThread):
             self.subscriptions.append(topic)
             if self.client.is_connected():
                 self.client.subscribe(topic)
+                print(f"Subscribed to: {topic}")
 
     def run(self):
         self.running = True

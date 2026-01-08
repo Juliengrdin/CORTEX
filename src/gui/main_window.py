@@ -21,6 +21,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.tabs)
 
         # MQTT Manager
+        # We assume localhost for now, or could load from config
         self.mqtt_manager = MqttManager()
         self.mqtt_manager.message_received.connect(self.dispatch_message)
         self.mqtt_manager.start()
@@ -38,6 +39,7 @@ class MainWindow(QMainWindow):
             print(f"Created plugins directory at {plugins_dir}")
             return
 
+        print(f"Loading plugins from {plugins_dir}...")
         for root, dirs, files in os.walk(plugins_dir):
             for file in files:
                 if file.endswith(".py") and not file.startswith("__"):
@@ -46,7 +48,9 @@ class MainWindow(QMainWindow):
 
     def load_plugin_from_file(self, filepath):
         try:
-            spec = importlib.util.spec_from_file_location("module.name", filepath)
+            # Create a module name based on file path
+            module_name = os.path.splitext(os.path.basename(filepath))[0]
+            spec = importlib.util.spec_from_file_location(module_name, filepath)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
 
@@ -69,25 +73,23 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(plugin, name)
 
         # Subscribe to plugin topics
-        topics = plugin.get_subscribe_topics()
-        for topic in topics:
-            self.mqtt_manager.subscribe(topic)
+        try:
+            topics = plugin.get_subscribe_topics()
+            for topic in topics:
+                self.mqtt_manager.subscribe(topic)
+        except NotImplementedError:
+            print(f"Plugin {name} does not implement get_subscribe_topics")
 
     def dispatch_message(self, topic, payload):
         """
         Dispatches MQTT messages to relevant plugins.
         """
         for plugin in self.plugins:
-            # Simple topic matching (could be improved with wildcards)
-            # Assuming plugins want to handle messages for topics they subscribed to.
-            # But the MQTT manager emits all messages.
-            # We can let the plugin filter or check if the topic matches any of its subscriptions.
-
-            # For this implementation, we pass everything to the plugin and let it decide,
-            # or check if it matches subscribed topics (accounting for wildcards is tricky without a library)
-
-            # Since InstrumentPlugin has handle_message, we just call it.
-            plugin.handle_message(topic, payload)
+            # We broadcast to all plugins and let them filter/handle
+            try:
+                plugin.handle_message(topic, payload)
+            except Exception as e:
+                print(f"Error dispatching message to plugin: {e}")
 
     def closeEvent(self, event):
         self.mqtt_manager.stop()
