@@ -129,18 +129,25 @@ class InstrumentFrame(QFrame):
             # Connect direct toggle action
             widget.toggled.connect(lambda state: self.send_command(param, state))
             parent_layout.addWidget(widget)
+            # Register the widget if the parameter needs it
+            if hasattr(param, 'update_widget'):
+                 param.update_widget = widget.setChecked
             return widget
         
         elif param.param_type in ["float", "int", "str"]:
             widget = QLineEdit()
             widget.setPlaceholderText(str(param.unit))
             parent_layout.addWidget(widget)
+            if hasattr(param, 'update_widget'):
+                 param.update_widget = widget.setText
             return widget
             
-        elif param.param_type is 'input':
+        elif param.param_type == 'input':
             widget = QLabel("_")
             widget.setStyleSheet(Style.Label.frequency_big)
             parent_layout.addWidget(widget)
+            if hasattr(param, 'update_widget'):
+                 param.update_widget = widget.setText
             return widget
             
         return QWidget() # Fallback empty widget

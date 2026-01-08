@@ -3,28 +3,15 @@ import os
 import InitializeCortex
 from src.gui.assets.instrument_base import InstrumentBase, Parameter
 from src.instruments.frontend.frontend_wavemeter import MqttWavemeter
+from functools import partial
+from PyQt6.QtCore import pyqtSlot
 
 # ==============================================================================
 #   SECTION 1: USER CONFIGURATION
 # ==============================================================================
-DISPLAY_NAME = "HighFinesse Wavemeter NM Channel 1"
+DISPLAY_NAME = "HighFinesse Wavemeter (Multi-Channel)"
 CATEGORY = 'Sensor'
-RESOURCE_ID  = "HFWM/8731/frequency/1" # acts as the topic for this driver
-
-CONFIG = {
-    "frequency": {
-        "label": None,
-        "unit":  "THz",
-        "type":  'input', # Display as string to avoid formatting issues
-        "scan":  False,  # You don't 'set' this during a scan, you 'read' it
-    },
-    "setpoint": {
-        "label": "Setpoint Frequency",
-        "unit":  "THz",
-        "type":  "str", # Display as string to avoid formatting issues
-        "scan":  True  # You don't 'set' this during a scan, you 'read' it
-    }
-}
+RESOURCE_BASE  = "HFWM/8731/frequency/"
 
 # ==============================================================================
 #   SECTION 2: INSTRUMENT LOGIC
@@ -32,44 +19,56 @@ CONFIG = {
 class WavemeterPlugin(InstrumentBase):
     def __init__(self):
         super().__init__(DISPLAY_NAME)
-        self.driver = None
+        self.drivers = {}
         self.category = CATEGORY
-
-        cfg = CONFIG["frequency"]
-        self.add_parameter(Parameter(
-            name="frequency",
-            label=cfg["label"],
-            param_type=cfg["type"],
-            unit=cfg["unit"],
-            set_cmd=None, # Read-only: No set command
-            get_cmd=self.get_freq_wrapper,
-            scannable=cfg["scan"]
-        ))
         
-        cfg = CONFIG["setpoint"]
-        self.add_parameter(Parameter(
-            name="setpoint",
-            label=cfg["label"],
-            param_type=cfg["type"],
-            unit=cfg["unit"],
-            set_cmd=None, # Read-only: No set command
-            get_cmd=self.get_freq_wrapper,
-            scannable=cfg["scan"]
-        ))
+        # Define 4 channels
+        for ch in range(1, 5):
+            self.add_channel_parameters(ch)
         
         self.connect_instrument()
 
-    def connect_instrument(self):
-        print(f"[{self.name}] Subscribing to {RESOURCE_ID}...")
-        try:
-            # Note: The original driver expects 'resource_string'
-            self.driver = MqttWavemeter(RESOURCE_ID)
-            self.driver.open() # Starts the MQTT loop
-        except Exception as e:
-            print(f"[{self.name}] Connection failed: {e}")
+    def add_channel_parameters(self, channel):
+        # Frequency Readout
+        self.add_parameter(Parameter(
+            name=f"frequency_ch{channel}",
+            label=f"Ch {channel}",
+            param_type='input',
+            unit="THz",
+            set_cmd=None,
+            get_cmd=partial(self.get_freq_wrapper, channel),
+            scannable=False
+        ))
 
-    def get_freq_wrapper(self):
-        if self.driver:
-            val = self.driver.getdata()
-            return f"{val:.6f}" # Format as string
+    def connect_instrument(self):
+        for ch in range(1, 5):
+            resource_id = f"{RESOURCE_BASE}{ch}"
+            print(f"[{self.name}] Subscribing to {resource_id}...")
+            try:
+                driver = MqttWavemeter(resource_id)
+                driver.open()
+                self.drivers[ch] = driver
+
+                # Connect Signal
+                # using partial to pass the channel number
+                driver.frequency_updated.connect(partial(self.on_freq_update, channel=ch))
+
+            except Exception as e:
+                print(f"[{self.name}] Connection failed for Ch {ch}: {e}")
+
+    def get_freq_wrapper(self, channel):
+        if channel in self.drivers:
+            val = self.drivers[channel].getdata()
+            return f"{val:.6f}"
         return "0.0"
+
+    @pyqtSlot(float) # Slot to handle updates from background thread
+    def on_freq_update(self, value, channel=None):
+        # Note: partial passes channel as keyword argument if defined like that
+        # logic to update the specific parameter widget
+        param_name = f"frequency_ch{channel}"
+        if param_name in self.parameters:
+            param = self.parameters[param_name]
+            if param.update_widget:
+                text = f"{value:.6f}"
+                param.update_widget(text)
