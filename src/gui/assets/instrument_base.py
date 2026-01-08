@@ -1,18 +1,23 @@
 from dataclasses import dataclass
 from typing import Callable, Any, Optional
+from PyQt6.QtCore import QObject
 
 @dataclass
 class Parameter:
     name: str
     label: str
-    param_type: str  # 'bool', 'float', 'int', 'str'
+    param_type: str  # 'bool', 'float', 'int', 'str', 'input'
     set_cmd: Optional[Callable[[Any], None]] = None # Function to set value
     get_cmd: Optional[Callable[[], Any]] = None     # Function to read value
     unit: str = ""
     scannable: bool = False
     
-class InstrumentBase:
+    # New field to allow the plugin to update the UI
+    update_widget: Optional[Callable[[Any], None]] = None
+
+class InstrumentBase(QObject):
     def __init__(self, name):
+        super().__init__()
         self.name = name
         self.parameters = {} # Dictionary to store params
 
