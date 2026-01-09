@@ -56,8 +56,7 @@ class MqttAWG(InstrumentBase):
             name="output",
             label=cfg["label"],
             param_type=cfg["type"],
-            set_cmd=self.set_output_state,
-            scannable=cfg["scan"]
+            set_cmd=self.set_output_state
         ))
 
         # --- 2. Frequency ---
@@ -67,8 +66,7 @@ class MqttAWG(InstrumentBase):
             label=cfg["label"],
             param_type=cfg["type"],
             unit=cfg["unit"],
-            set_cmd=self.set_freq_wrapper,
-            scannable=cfg["scan"]
+            set_cmd=self.set_freq_wrapper
         ))
 
         # --- 3. Amplitude ---
@@ -78,8 +76,7 @@ class MqttAWG(InstrumentBase):
             label=cfg["label"],
             param_type=cfg["type"],
             unit=cfg["unit"],
-            set_cmd=self.set_amp_wrapper,
-            scannable=cfg["scan"]
+            set_cmd=self.set_amp_wrapper
         ))
     
         self.connect_instrument()

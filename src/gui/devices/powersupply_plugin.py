@@ -60,8 +60,7 @@ def create_psu_class(device_config):
                 label=f"Ch{ch_num} Set (V)",
                 param_type="float",
                 unit="V",
-                set_cmd=lambda val, c=ch_num: self.set_volts_wrapper(c, val),
-                scannable=True
+                set_cmd=lambda val, c=ch_num: self.set_volts_wrapper(c, val)
             ))
 
             # Enable (Checkbox)
@@ -69,8 +68,7 @@ def create_psu_class(device_config):
                 name=f"ch{ch_num}_enable",
                 label=f"Ch{ch_num} On/Off",
                 param_type="bool",
-                set_cmd=lambda val, c=ch_num: self.set_enable_wrapper(c, val),
-                scannable=False
+                set_cmd=lambda val, c=ch_num: self.set_enable_wrapper(c, val)
             ))
         
         def connect_instrument(self):

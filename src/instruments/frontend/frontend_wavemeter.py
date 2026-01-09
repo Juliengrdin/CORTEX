@@ -1,9 +1,12 @@
 from typing import Any
 import paho.mqtt.client as mqtt
 from PyQt6.QtCore import QObject, pyqtSignal
+from collections import deque
+import statistics
 
 class MqttWavemeter(QObject):
     frequency_updated = pyqtSignal(float)
+    sigma_updated = pyqtSignal(float)
 
     wavelength_value = 0.0
     client = None
@@ -13,6 +16,7 @@ class MqttWavemeter(QObject):
     def __init__(self, resource_string: str):
         super().__init__()
         self.mqtt_path = resource_string
+        self.history = deque(maxlen=20) # Store last 20 readings for stability calc
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -38,7 +42,14 @@ class MqttWavemeter(QObject):
 
                 if value > 0:
                     self.frequency_value = value
+                    self.history.append(value)
                     self.frequency_updated.emit(value)
+
+                    if len(self.history) >= 2:
+                        sigma = statistics.stdev(self.history)
+                        self.sigma_updated.emit(sigma)
+                    else:
+                        self.sigma_updated.emit(999.0) # Unstable/Unknown
         except Exception as e:
             print(f"Error parsing MQTT message: {e}")
 

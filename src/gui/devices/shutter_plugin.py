@@ -39,8 +39,7 @@ class ShutterPlugin(InstrumentBase):
             name="state",
             label=cfg["label"],
             param_type=cfg["type"],
-            set_cmd=self.set_state_wrapper,
-            scannable=cfg["scan"]
+            set_cmd=self.set_state_wrapper
         ))
 
         # --- 2. Pulse Trigger (Value + Set Button) ---
@@ -51,8 +50,7 @@ class ShutterPlugin(InstrumentBase):
             label=cfg["label"],
             param_type=cfg["type"],
             unit=cfg["unit"],
-            set_cmd=self.pulse_wrapper,
-            scannable=cfg["scan"]
+            set_cmd=self.pulse_wrapper
         ))
         
         self.connect_instrument()
