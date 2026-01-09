@@ -108,7 +108,7 @@ class InstrumentFrame(QFrame):
         input_widget = self._create_input_widget(param, row_layout)
         
         # 'Send' Button (Only for non-boolean params)
-        if param.param_type != "bool" and param.param_type is not 'input':
+        if param.param_type != "bool" and param.param_type != 'input':
             btn = QPushButton("Send")
             btn.setStyleSheet(Style.Button.suggested) # Fixed reference
             btn.setCursor(Qt.CursorShape.PointingHandCursor)

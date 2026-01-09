@@ -21,18 +21,18 @@ class WavemeterPlugin(InstrumentBase):
         super().__init__(DISPLAY_NAME)
         self.drivers = {}
         self.category = CATEGORY
-        
-        # Define 4 channels
-        for ch in range(1, 5):
+
+        # Define 8 channels
+        for ch in range(1, 9):
             self.add_channel_parameters(ch)
-        
+
         self.connect_instrument()
 
     def add_channel_parameters(self, channel):
         # Frequency Readout
         self.add_parameter(Parameter(
             name=f"frequency_ch{channel}",
-            label=f"Ch {channel}",
+            label=f"Ch {channel} Freq",
             param_type='input',
             unit="THz",
             set_cmd=None,
@@ -40,8 +40,19 @@ class WavemeterPlugin(InstrumentBase):
             scannable=False
         ))
 
+        # Setpoint Input
+        self.add_parameter(Parameter(
+            name=f"setpoint_ch{channel}",
+            label=f"Ch {channel} Setpoint",
+            param_type='float', # Generates a QLineEdit
+            unit="THz",
+            set_cmd=partial(self.set_setpoint_wrapper, channel),
+            get_cmd=None,
+            scannable=True
+        ))
+
     def connect_instrument(self):
-        for ch in range(1, 5):
+        for ch in range(1, 9):
             resource_id = f"{RESOURCE_BASE}{ch}"
             print(f"[{self.name}] Subscribing to {resource_id}...")
             try:
@@ -61,6 +72,12 @@ class WavemeterPlugin(InstrumentBase):
             val = self.drivers[channel].getdata()
             return f"{val:.6f}"
         return "0.0"
+
+    def set_setpoint_wrapper(self, channel, value):
+        if channel in self.drivers:
+            self.drivers[channel].set_setpoint(value)
+        else:
+            print(f"[{self.name}] Error: No driver for Ch {channel}")
 
     @pyqtSlot(float) # Slot to handle updates from background thread
     def on_freq_update(self, value, channel=None):
