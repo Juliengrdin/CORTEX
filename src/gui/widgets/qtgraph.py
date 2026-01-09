@@ -1,12 +1,14 @@
 import pyqtgraph as pg
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QBrush
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush
 
 
 class Graph(pg.PlotWidget):
     def __init__(self):
         super().__init__()
-        self.setBackground(QBrush(Qt.transparent))  # Transparent background
+        # Use simple 'None' or color name for transparent, or QColor(0,0,0,0)
+        # pyqtgraph handles QColor from PyQt6 if PyQt6 is the binding
+        self.setBackground(QColor(0, 0, 0, 0))  # Transparent background
 
         # Set axis labels
         self.getPlotItem().setLabel('left', 'Signal', units='Volt')
