@@ -208,6 +208,9 @@ class InstrumentPanel(QWidget):
         # Store category widgets to manage indices
         self.category_pages = {}
 
+        # Store loaded instruments for external access
+        self.loaded_instruments = []
+
         # 3. Load & Organize Instruments
         if not devices_path:
             devices_path = os.path.join(os.path.dirname(__file__), "devices")
@@ -220,11 +223,11 @@ class InstrumentPanel(QWidget):
 
     def _load_and_display_plugins(self, plugin_dir: str):
         """Loads python files and creates pages for each category."""
-        all_instruments = self._load_plugins_from_disk(plugin_dir)
+        self.loaded_instruments = self._load_plugins_from_disk(plugin_dir)
         
         # Group by Category
         grouped = defaultdict(list)
-        for inst in all_instruments:
+        for inst in self.loaded_instruments:
             cat = getattr(inst, 'category', 'Uncategorized')
             grouped[cat].append(inst)
             
