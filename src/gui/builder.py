@@ -3,7 +3,7 @@ import sys
 import importlib.util
 from collections import defaultdict
 from typing import List, Optional
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
@@ -15,6 +15,10 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QVBoxLayout,
     QWidget,
+    QListWidget,
+    QStackedWidget,
+    QListWidgetItem,
+    QSizePolicy
 )
 
 # --- Local Imports ---
@@ -22,6 +26,7 @@ import InitializeCortex
 from src.gui.assets.csstyle import Style
 from src.gui.assets.instrument_base import InstrumentBase, Parameter
 from src.gui.widgets.smaller_toggle import AnimatedToggle
+from src.gui.widgets.flow_layout import FlowLayout
 
 
 # ==============================================================================
@@ -68,12 +73,13 @@ class InstrumentFrame(QFrame):
     def __init__(self, instrument: InstrumentBase):
         super().__init__()
         self.instrument = instrument
-        self.scannable = False
         
         # Main Layout
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         self.setStyleSheet(Style.Default.light)
+        # Limit width for responsive grid
+        self.setFixedWidth(280)
 
         # 1. Header (Title + Divider)
         self._init_header()
@@ -81,6 +87,11 @@ class InstrumentFrame(QFrame):
         # 2. Parameter Controls
         for param in self.instrument.get_all_params():
             self._add_parameter_row(param)
+
+    @property
+    def scannable(self):
+        # Scan through all parameters to see if any are scannable
+        return any(p.scannable for p in self.instrument.get_all_params())
 
     def _init_header(self):
         """Creates the bold title and horizontal divider line."""
@@ -116,9 +127,6 @@ class InstrumentFrame(QFrame):
             btn.clicked.connect(lambda: self.send_command(param, input_widget.text()))
             row_layout.addWidget(btn)
             
-        # Track scannability for higher-level logic (if needed)
-        if param.scannable:
-            self.scannable = True
 
         self.layout.addLayout(row_layout)
 
@@ -148,6 +156,8 @@ class InstrumentFrame(QFrame):
             parent_layout.addWidget(widget)
             if hasattr(param, 'update_widget'):
                  param.update_widget = widget.setText
+            if hasattr(param, 'update_widget_style'):
+                 param.update_widget_style = widget.setStyleSheet
             return widget
             
         return QWidget() # Fallback empty widget
@@ -170,85 +180,70 @@ class InstrumentFrame(QFrame):
             print(f"[{self.instrument.name}] Error: Invalid input for {param.name}")
 
 
-class CategoryColumn(QFrame):
-    """
-    A vertical column representing one category of instruments (e.g., 'Lasers').
-    Contains a Title and a ScrollArea for the instruments.
-    """
-    def __init__(self, category_name: str, instruments: List[InstrumentBase]):
-        super().__init__()
-        self.setObjectName("CategoryFrame")
-        self.setStyleSheet(Style.Frame.container_light)
-        self.setFixedWidth(300) # Slightly wider for better breathing room
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        
-        # 1. Title
-        title = QLabel(category_name)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(Style.Label.title_light)
-        layout.addWidget(title)
-        
-        # 2. Scroll Area
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setStyleSheet(Style.Scroll.transparent)
-        
-        # 3. Container for Instruments
-        container = QWidget()
-        v_layout = QVBoxLayout(container)
-        v_layout.setSpacing(10)
-        v_layout.setContentsMargins(5, 5, 5, 5)
-        
-        for inst in instruments:
-            frame = InstrumentFrame(inst)
-            v_layout.addWidget(frame)
-            
-        v_layout.addStretch() # Push items to top
-        
-        self.scroll.setWidget(container)
-        layout.addWidget(self.scroll)
-
-
 class InstrumentPanel(QWidget):
     """
     The Main Dashboard Panel.
-    Loads plugins dynamically and arranges them into horizontal category columns.
+    Loads plugins and arranges them in a Discord-style layout:
+    - Left Sidebar (Tabs/Categories)
+    - Right Content Area (Responsive Grid/Flow)
     """
     def __init__(self, devices_path: Optional[str] = None):
         super().__init__()
         
-        # Main Layout (Fill the window)
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        # Main Layout (Splitter-like)
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
         
-        # 1. Horizontal Scroll Area (Holds the columns)
-        self.h_scroll = QScrollArea()
-        self.h_scroll.setWidgetResizable(True)
-        self.h_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.h_scroll.setStyleSheet(Style.Scroll.Htransparent)
+        # 1. Sidebar (Category List)
+        self.sidebar = QListWidget()
+        self.sidebar.setFixedWidth(200)
+        self.sidebar.setStyleSheet("""
+            QListWidget {
+                background-color: #2F3136;
+                color: #B9BBBE;
+                border: none;
+                font-size: 14px;
+                padding-top: 10px;
+            }
+            QListWidget::item {
+                height: 40px;
+                padding-left: 10px;
+                margin: 2px 10px;
+                border-radius: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #40444B;
+                color: #FFFFFF;
+            }
+            QListWidget::item:hover {
+                background-color: #36393F;
+                color: #DCDDDE;
+            }
+        """)
+        self.sidebar.currentItemChanged.connect(self._on_category_changed)
+        self.main_layout.addWidget(self.sidebar)
         
-        # 2. Container for Columns
-        self.columns_container = QWidget()
-        self.columns_layout = QHBoxLayout(self.columns_container)
-        self.columns_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.columns_layout.setSpacing(15)
-        self.columns_layout.setContentsMargins(15, 15, 15, 15)
+        # 2. Content Area (Stacked Widget)
+        self.content_stack = QStackedWidget()
+        self.content_stack.setStyleSheet("background-color: #36393F;") # Darker background for contrast
+        self.main_layout.addWidget(self.content_stack)
         
-        self.h_scroll.setWidget(self.columns_container)
-        main_layout.addWidget(self.h_scroll)
+        # Store category widgets to manage indices
+        self.category_pages = {}
 
         # 3. Load & Organize Instruments
         if not devices_path:
-            # Default to 'devices' folder in current directory
             devices_path = os.path.join(os.path.dirname(__file__), "devices")
 
         self._load_and_display_plugins(devices_path)
 
+        # Select first item by default
+        if self.sidebar.count() > 0:
+            self.sidebar.setCurrentRow(0)
+
     def _load_and_display_plugins(self, plugin_dir: str):
-        """Loads python files from directory and creates UI columns."""
+        """Loads python files and creates pages for each category."""
         all_instruments = self._load_plugins_from_disk(plugin_dir)
         
         # Group by Category
@@ -257,24 +252,49 @@ class InstrumentPanel(QWidget):
             cat = getattr(inst, 'category', 'Uncategorized')
             grouped[cat].append(inst)
             
-        # --- FIX: Custom Sort Order ---
+        # Sort Categories
         def category_sort_key(name):
-            # If name is in this list, return 1 (pushes to end). Else 0 (stays at top).
             special_categories = ["Miscellaneous", "Divers", "Other", "Uncategorized"]
             priority = 1 if name in special_categories else 0
             return (priority, name)
 
-        # Apply the custom sort key
         sorted_categories = sorted(grouped.keys(), key=category_sort_key)
 
         for category_name in sorted_categories:
             instruments = grouped[category_name]
-            
-            # Sort Instruments within the Category Alphabetically
             instruments.sort(key=lambda inst: inst.name)
             
-            column = CategoryColumn(category_name, instruments)
-            self.columns_layout.addWidget(column)
+            # Create Page for Category
+            page_widget = QWidget()
+            # Use FlowLayout for responsive grid
+            flow_layout = FlowLayout(page_widget, margin=20, spacing=20)
+
+            for inst in instruments:
+                frame = InstrumentFrame(inst)
+                flow_layout.addWidget(frame)
+
+            # Wrap in Scroll Area
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(page_widget)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setStyleSheet(Style.Scroll.transparent)
+
+            # Add to Stack
+            self.content_stack.addWidget(scroll)
+            self.category_pages[category_name] = scroll
+
+            # Add to Sidebar
+            item = QListWidgetItem(category_name)
+            self.sidebar.addItem(item)
+
+    def _on_category_changed(self, current_item, previous_item):
+        if not current_item:
+            return
+        category_name = current_item.text()
+        if category_name in self.category_pages:
+            widget = self.category_pages[category_name]
+            self.content_stack.setCurrentWidget(widget)
 
     def _load_plugins_from_disk(self, plugin_dir: str) -> List[InstrumentBase]:
         """Scans folder for .py files and instantiates InstrumentBase subclasses."""
@@ -300,7 +320,6 @@ class InstrumentPanel(QWidget):
                             if (isinstance(attr, type) and 
                                 issubclass(attr, InstrumentBase) and 
                                 attr is not InstrumentBase):
-                                print(f"DEBUG: Loading '{attr().name}' from file: {filename} (Class: {attr_name})")
                                 # Instantiate and add
                                 loaded_instruments.append(attr())
                 except Exception as e:
@@ -321,7 +340,7 @@ if __name__ == "__main__":
     
     win = QMainWindow()
     win.setWindowTitle("CORTEX Laboratory Dashboard")
-    win.resize(960, 500)
+    win.resize(1200, 700) # Slightly larger default for new layout
     
     panel = InstrumentPanel()
     win.setCentralWidget(panel)

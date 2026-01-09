@@ -5,6 +5,7 @@ from src.gui.assets.instrument_base import InstrumentBase, Parameter
 from src.instruments.frontend.frontend_wavemeter import MqttWavemeter
 from functools import partial
 from PyQt6.QtCore import pyqtSlot
+from src.gui.assets.csstyle import Style
 
 # ==============================================================================
 #   SECTION 1: USER CONFIGURATION
@@ -21,6 +22,7 @@ class WavemeterPlugin(InstrumentBase):
         super().__init__(DISPLAY_NAME)
         self.drivers = {}
         self.category = CATEGORY
+        self.channel_sigmas = {} # Stores latest sigma for each channel
 
         # Define 8 channels
         for ch in range(1, 9):
@@ -36,8 +38,7 @@ class WavemeterPlugin(InstrumentBase):
             param_type='input',
             unit="THz",
             set_cmd=None,
-            get_cmd=partial(self.get_freq_wrapper, channel),
-            scannable=False
+            get_cmd=partial(self.get_freq_wrapper, channel)
         ))
 
         # Setpoint Input
@@ -47,8 +48,7 @@ class WavemeterPlugin(InstrumentBase):
             param_type='float', # Generates a QLineEdit
             unit="THz",
             set_cmd=partial(self.set_setpoint_wrapper, channel),
-            get_cmd=None,
-            scannable=True
+            get_cmd=None
         ))
 
     def connect_instrument(self):
@@ -60,9 +60,9 @@ class WavemeterPlugin(InstrumentBase):
                 driver.open()
                 self.drivers[ch] = driver
 
-                # Connect Signal
-                # using partial to pass the channel number
+                # Connect Signals
                 driver.frequency_updated.connect(partial(self.on_freq_update, channel=ch))
+                driver.sigma_updated.connect(partial(self.on_sigma_update, channel=ch))
 
             except Exception as e:
                 print(f"[{self.name}] Connection failed for Ch {ch}: {e}")
@@ -79,13 +79,44 @@ class WavemeterPlugin(InstrumentBase):
         else:
             print(f"[{self.name}] Error: No driver for Ch {channel}")
 
-    @pyqtSlot(float) # Slot to handle updates from background thread
+    @pyqtSlot(float)
     def on_freq_update(self, value, channel=None):
-        # Note: partial passes channel as keyword argument if defined like that
-        # logic to update the specific parameter widget
         param_name = f"frequency_ch{channel}"
         if param_name in self.parameters:
             param = self.parameters[param_name]
             if param.update_widget:
                 text = f"{value:.6f}"
                 param.update_widget(text)
+
+    @pyqtSlot(float)
+    def on_sigma_update(self, sigma, channel=None):
+        self.channel_sigmas[channel] = sigma
+
+        # Threshold: 10 MHz = 0.00001 THz
+        STABILITY_THRESHOLD = 0.00001
+
+        # 1. Check direct stability
+        is_stable = sigma < STABILITY_THRESHOLD
+
+        # 2. Check against Global Average of Stable Channels (as requested)
+        stable_values = [s for s in self.channel_sigmas.values() if s < STABILITY_THRESHOLD]
+        if stable_values:
+            avg_stable_sigma = sum(stable_values) / len(stable_values)
+            # Logic: "For every channel that is considered stable (or falls within this calculated Averaged Sigma range)"
+            # Note: If sigma < AvgStable (< 10 MHz), it is necessarily stable (< 10 MHz).
+            # So the condition effectively remains sigma < 10 MHz.
+            # But we'll implement the check anyway if logic changes.
+            if sigma < avg_stable_sigma:
+                is_stable = True
+
+        # Update Style
+        param_name = f"frequency_ch{channel}"
+        if param_name in self.parameters:
+            param = self.parameters[param_name]
+            if param.update_widget_style:
+                if is_stable:
+                    # Green text
+                    param.update_widget_style("color: #4CAF50; font-weight: bold;")
+                else:
+                    # Default
+                    param.update_widget_style(Style.Label.frequency_big)

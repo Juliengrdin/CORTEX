@@ -27,8 +27,7 @@ class CameraPlugin(InstrumentBase):
             param_type='input',
             unit="",
             set_cmd=None,
-            get_cmd=None,
-            scannable=False
+            get_cmd=None
         ))
 
         self.connect_instrument()

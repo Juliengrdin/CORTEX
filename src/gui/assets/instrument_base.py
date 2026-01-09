@@ -10,10 +10,15 @@ class Parameter:
     set_cmd: Optional[Callable[[Any], None]] = None # Function to set value
     get_cmd: Optional[Callable[[], Any]] = None     # Function to read value
     unit: str = ""
-    scannable: bool = False
     
     # New field to allow the plugin to update the UI
     update_widget: Optional[Callable[[Any], None]] = None
+    # New field to allow the plugin to update the UI style
+    update_widget_style: Optional[Callable[[str], None]] = None
+
+    @property
+    def scannable(self) -> bool:
+        return self.param_type == 'float'
 
 class InstrumentBase(QObject):
     def __init__(self, name):
