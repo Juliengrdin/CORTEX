@@ -674,3 +674,34 @@ class Style:
                 color: {Palette.L_TEXT_MAIN};
             }}
         """
+        
+        secondary_light = f"""
+            QListWidget {{
+                background-color: {Palette.L_BG_FRAME_1};
+                color: {Palette.L_TEXT_SEC};
+                
+                /* Define the shape that casts the shadow */
+                border: 1px solid {Palette.L_INT_HOVER}; 
+                border-radius: 8px;
+                
+                /* Padding to keep items away from corners */
+                padding: 6px; 
+                
+                font-size: {Palette.FONT_SIZE_L};
+                outline: none;
+            }}
+            QListWidget::item {{
+                height: 40px;
+                padding-left: 10px;
+                margin: 2px 0px; 
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {Palette.L_INT_SELECT};
+                color: #ffffff;
+            }}
+            QListWidget::item:hover {{
+                background-color: {Palette.L_INT_HOVER};
+                color: {Palette.L_TEXT_MAIN};
+            }}
+        """

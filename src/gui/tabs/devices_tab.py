@@ -154,7 +154,7 @@ class InstrumentFrame(QFrame):
             widget.setStyleSheet(Style.Label.frequency_big)
             parent_layout.addWidget(widget)
             if hasattr(param, 'update_widget'):
-                 param.update_widget = widget.setText
+                 param.update_widget_rich = widget.setText
             if hasattr(param, 'update_widget_style'):
                  param.update_widget_style = widget.setStyleSheet
             return widget

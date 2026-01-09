@@ -3,8 +3,7 @@ import os
 import threading
 from PyQt6.QtWidgets import QApplication
 
-# Ensure root is in path
-sys.path.append(os.getcwd())
+import InitializeCortex
 
 # Import Backend Simulator
 from src.instruments.backend.fake_backend import FakeBackend

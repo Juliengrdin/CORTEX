@@ -34,10 +34,13 @@ class GraphBlock(QFrame):
         self.data_x = deque()
         self.data_y = deque()
         self.start_time = time.time()
+        
+        self.active_hook_param = None      # To track which param we modified
+        self.active_original_callback = None #
 
         # Default max window: 2 hours (120 minutes)
         # Stored in seconds
-        self.max_window_seconds = 7200
+        self.max_window_seconds = 60 #avoid high memory usage
 
         # State control
         self.paused = False
@@ -57,13 +60,14 @@ class GraphBlock(QFrame):
 
         # --- Left Column: Controls Panel ---
         controls_frame = QFrame()
-        controls_frame.setFixedWidth(200) # Fixed width for controls
+        controls_frame.setFixedWidth(150) # Fixed width for controls
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setContentsMargins(0, 0, 0, 0)
 
         # 1. Parameter Selector
         controls_layout.addWidget(QLabel("Sensor Parameter:"))
         self.combo = QComboBox()
+        #self.combo.setStyleSheet(Style.Input.combobox_light)
         self.combo.addItem("Select Parameter...")
         self._populate_combo()
         self.combo.currentIndexChanged.connect(self._on_param_selected)
@@ -79,8 +83,9 @@ class GraphBlock(QFrame):
         # 2. Window Size Setting (Minutes)
         controls_layout.addWidget(QLabel("History (min):"))
         self.edit_window = QLineEdit()
+        self.edit_window.setStyleSheet(Style.Input.line_edit_light)
         self.edit_window.setPlaceholderText("Minutes")
-        self.edit_window.setText("120") # Default 120 mins = 2 hours
+        self.edit_window.setText("1") # Default 1 mins
         self.edit_window.returnPressed.connect(self._on_window_changed)
         self.edit_window.editingFinished.connect(self._on_window_changed)
         controls_layout.addWidget(self.edit_window)
@@ -114,7 +119,7 @@ class GraphBlock(QFrame):
 
         # 4. Delete Button
         self.btn_delete = QPushButton("Delete Graph")
-        self.btn_delete.setStyleSheet(Style.Button.destructive if hasattr(Style.Button, 'destructive') else "background-color: #e74c3c; color: white;")
+        self.btn_delete.setStyleSheet(Style.Button.simple_dark)
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete.clicked.connect(self.delete_block)
         controls_layout.addWidget(self.btn_delete)
@@ -123,7 +128,7 @@ class GraphBlock(QFrame):
 
         # --- Right Column: Graph ---
         self.graph = Graph()
-        self.graph.setFixedHeight(300)
+        #self.graph.setFixedHeight(300)
         # self.graph.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.graph)
 
@@ -180,8 +185,12 @@ class GraphBlock(QFrame):
             pass
 
     def _on_param_selected(self, index):
+        # 1. DISCONNECT THE OLD PARAMETER FIRST
+        self._unhook_current_param()
+
         if index <= 0:
             self.current_param = None
+            self.reset_graph()
             return
 
         data = self.combo.itemData(index)
@@ -190,24 +199,32 @@ class GraphBlock(QFrame):
 
         inst, param = data
 
-        # Reset Data
+        # Reset Graph Data
         self.current_param = param
         self.reset_graph()
 
-        # Hook into the parameter update mechanism
+        # 2. SAVE THE ORIGINAL CALLBACK
         original_callback = getattr(param, 'update_widget', None)
-
+        
+        # 3. DEFINE THE NEW INTERCEPTOR
         def interceptor(value):
+            # Pass data to the original GUI widget (if any)
             if original_callback:
                 try:
                     original_callback(value)
                 except Exception as e:
                     print(f"Error in original callback: {e}")
+            # Pass data to our graph
             self._record_value(value)
 
+        # 4. OVERWRITE THE CALLBACK (HOOK)
         param.update_widget = interceptor
 
-        # Initial Plot update
+        # 5. STORE STATE SO WE CAN UNDO THIS LATER
+        self.active_hook_param = param
+        self.active_original_callback = original_callback
+
+        # Update Plot Labels
         self.graph.getPlotItem().setTitle(f"{inst.name} - {param.label or param.name}")
         self.graph.getPlotItem().setLabel('left', param.label or param.name, units=param.unit)
 
@@ -233,26 +250,7 @@ class GraphBlock(QFrame):
         try:
             val = float(value)
         except (ValueError, TypeError):
-            # Attempt to handle html string if necessary, but backend should send float mostly?
-            # Or formatted string.
-            # In WavemeterPlugin, update_widget receives a HTML string.
-            # But wait, does update_widget receive the RAW value or the formatted one?
-            # In WavemeterPlugin:
-            #   driver.frequency_updated.connect(partial(self.on_freq_update, channel=ch))
-            #   def on_freq_update(self, value, channel=None): ... param.update_widget(text)
-            # It seems `on_freq_update` calls `update_widget` with the HTML text.
-            # This is a problem for plotting if we hook into `update_widget`.
-            # We are intercepting the UI update, so we get the UI-ready text.
-            # Ideally, we should hook into the signal or the setter, but `on_freq_update` is the slot.
-            # The backend sends raw float to `on_freq_update`.
-            # `param` itself doesn't have a value storage, just callbacks.
-            # If we hook `param.update_widget`, we get what `on_freq_update` passes to it.
-            # And `on_freq_update` constructs HTML.
-
-            # WORKAROUND: We need to parse the value.
-            # Or better, we should fix the architecture so data monitoring is separate from UI Widget updating.
-            # But for this task, I must work with what I have.
-            # Let's try to parse the float from string if simple conversion fails.
+            # Attempt to handle html string if necessary, but backend should send float mostlly TODO
             try:
                 # Basic cleanup for common cases (e.g. "123.456 V")
                 import re
@@ -298,8 +296,29 @@ class GraphBlock(QFrame):
         print("Graph Reset")
 
     def delete_block(self):
+        # Clean up the hook on the instrument before dying
+        self._unhook_current_param()
+        
         if self.parent_widget:
             self.parent_widget.remove_graph_block(self)
+            
+    def _unhook_current_param(self):
+        """Restores the original update_widget function for the previous parameter."""
+        if self.active_hook_param is not None:
+            # Restore the original function we saved earlier
+            if self.active_original_callback:
+                self.active_hook_param.update_widget = self.active_original_callback
+            else:
+                # If there was no callback originally, just remove ours (set to None or dummy)
+                # Usually keeping it as is or None is safe if it was None.
+                # Ideally, if it was None, we leave it, but we can't easily 'delete' the assignment
+                # unless we assigned a dummy. 
+                # Better approach: Just restore whatever self.active_original_callback was.
+                self.active_hook_param.update_widget = self.active_original_callback
+            
+            # Clear our tracking variables
+            self.active_hook_param = None
+            self.active_original_callback = None
 
 
 class LiveUpdateWidget(QWidget):

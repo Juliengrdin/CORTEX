@@ -108,7 +108,8 @@ class WavemeterPlugin(InstrumentBase):
                     f"</html>"
                 )
                 
-                param.update_widget(text)
+                param.update_widget_rich(text)
+                param.update_widget(full_str)
 
     @pyqtSlot(float)
     def on_sigma_update(self, sigma, channel=None):

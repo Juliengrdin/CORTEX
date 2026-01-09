@@ -1,1 +1,1 @@
-./venv/bin/python tests/fake_backend_test.py
+./venv/bin/python tests/run_with_fake_backend.py
