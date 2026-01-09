@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication
 sys.path.append(os.getcwd())
 
 # Import Backend Simulator
-from tests.fake_backend_test import BackendSimulator
+from src.instruments.backend.fake_backend import FakeBackend
 
 # Import GUI
 # Note: configure_mqtt_environment() is called in CORTEX.py or devices_tab.py
@@ -25,7 +25,7 @@ def run_app():
     app = QApplication(sys.argv)
 
     # 1. Start Backend Simulator
-    backend = BackendSimulator()
+    backend = FakeBackend()
     t = threading.Thread(target=backend.run, daemon=True)
     t.start()
     print(">> [Launcher] Fake Backend Started.")
