@@ -82,10 +82,32 @@ class WavemeterPlugin(InstrumentBase):
     @pyqtSlot(float)
     def on_freq_update(self, value, channel=None):
         param_name = f"frequency_ch{channel}"
+        
         if param_name in self.parameters:
             param = self.parameters[param_name]
+            
             if param.update_widget:
-                text = f"{value:.6f}"
+                # 1. Formatage du nombre complet (6 décimales)
+                full_str = f"{value:.6f}" 
+                
+                # 2. Découpage : Partie principale vs les 3 derniers digits
+                # ex: si value = 193.123456
+                # main_part = "193.123"
+                # fine_part = "456"
+                main_part = full_str[:-3]
+                fine_part = full_str[-3:]
+                
+                # 3. Construction HTML
+                # On met 'fine_part' dans un span avec une police réduite (ex: 10pt ou 11px)
+                # On ajoute l'unité THz à la fin (en taille normale)
+                text = (
+                    f"<html>"
+                    f"{main_part}"
+                    f"<span style='font-size: 13pt;'>{fine_part}</span>" 
+                    f" <span style='font-size: 13pt; color: #B9BBBE; font-weight: normal;'>THz</span>"
+                    f"</html>"
+                )
+                
                 param.update_widget(text)
 
     @pyqtSlot(float)
@@ -116,7 +138,7 @@ class WavemeterPlugin(InstrumentBase):
             if param.update_widget_style:
                 if is_stable:
                     # Green text
-                    param.update_widget_style("color: #4CAF50; font-weight: bold;")
+                    param.update_widget_style(Style.Label.frequency_big_stable)
                 else:
                     # Default
                     param.update_widget_style(Style.Label.frequency_big)

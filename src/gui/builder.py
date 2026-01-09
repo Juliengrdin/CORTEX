@@ -96,14 +96,12 @@ class InstrumentFrame(QFrame):
     def _init_header(self):
         """Creates the bold title and horizontal divider line."""
         title = QLabel(self.instrument.name)
-        title.setStyleSheet("font-weight: bold; margin-bottom: 4px; color: #333333;")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.layout.addWidget(title)
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
-        line.setStyleSheet("color: #DDDDDD;")
         self.layout.addWidget(line)
 
     def _add_parameter_row(self, param: Parameter):
@@ -121,9 +119,8 @@ class InstrumentFrame(QFrame):
         # 'Send' Button (Only for non-boolean params)
         if param.param_type != "bool" and param.param_type != 'input':
             btn = QPushButton("Send")
-            btn.setStyleSheet(Style.Button.suggested) # Fixed reference
+            btn.setStyleSheet(Style.Button.suggested)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            # Connect: Get text from input_widget when clicked
             btn.clicked.connect(lambda: self.send_command(param, input_widget.text()))
             row_layout.addWidget(btn)
             
@@ -197,36 +194,15 @@ class InstrumentPanel(QWidget):
         
         # 1. Sidebar (Category List)
         self.sidebar = QListWidget()
-        self.sidebar.setFixedWidth(200)
-        self.sidebar.setStyleSheet("""
-            QListWidget {
-                background-color: #2F3136;
-                color: #B9BBBE;
-                border: none;
-                font-size: 14px;
-                padding-top: 10px;
-            }
-            QListWidget::item {
-                height: 40px;
-                padding-left: 10px;
-                margin: 2px 10px;
-                border-radius: 4px;
-            }
-            QListWidget::item:selected {
-                background-color: #40444B;
-                color: #FFFFFF;
-            }
-            QListWidget::item:hover {
-                background-color: #36393F;
-                color: #DCDDDE;
-            }
-        """)
+        self.sidebar.setFixedWidth(150)
+        self.sidebar.setStyleSheet(Style.List.light)
         self.sidebar.currentItemChanged.connect(self._on_category_changed)
         self.main_layout.addWidget(self.sidebar)
         
         # 2. Content Area (Stacked Widget)
         self.content_stack = QStackedWidget()
-        self.content_stack.setStyleSheet("background-color: #36393F;") # Darker background for contrast
+        self.content_stack.setContentsMargins(10, 10, 10, 10)
+        self.content_stack.setStyleSheet(Style.Frame.container_light)
         self.main_layout.addWidget(self.content_stack)
         
         # Store category widgets to manage indices
@@ -267,7 +243,7 @@ class InstrumentPanel(QWidget):
             # Create Page for Category
             page_widget = QWidget()
             # Use FlowLayout for responsive grid
-            flow_layout = FlowLayout(page_widget, margin=20, spacing=20)
+            flow_layout = FlowLayout(page_widget, margin=10, spacing=10)
 
             for inst in instruments:
                 frame = InstrumentFrame(inst)

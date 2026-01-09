@@ -6,7 +6,7 @@ import threading
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
 # Ensure root is in path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import InitializeCortex
 
 # Force Mock Environment
 import tests.mock_paho_mqtt_plugin as mock_mqtt
@@ -37,7 +37,7 @@ class BackendSimulator:
                 timestamp = time.time()
                 for ch in range(1, 9):
                     # Random freq around 300 THz
-                    val = 300.0 + random.random()
+                    val = 300.0 + random.random()/70000 + random.random()/30000
                     payload = f"[{timestamp}, {val:.6f}]"
                     topic = f"HFWM/8731/frequency/{ch}"
                     self.client.publish(topic, payload)

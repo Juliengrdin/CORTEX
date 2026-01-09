@@ -17,6 +17,7 @@ class Palette:
     # Fonts
     FONT_MAIN = "Ubuntu"
     FONT_SIZE = "12px"
+    FONT_SIZE_L = "14px" # Larger font for lists/headers
     
     # --- Light Theme Palette ---
     L_BG_MAIN       = "#F2F2F2"   # Main window background
@@ -53,9 +54,14 @@ class Palette:
     STATUS_YELLOW   = "#FFC107"   # Reset
     STATUS_GREY     = "#CCCCCC"   # Disabled/Toggle Off
     
-    
-    
-    
+    # Interactions
+    D_INT_HOVER     = "#36393F"   # Hover State
+    D_INT_SELECT    = "#40444B"   # Selected/Pressed State
+    D_BORDER        = "#202225"   # Subtle borders
+
+    L_INT_HOVER     = "#7FD7FF"   # Hover State
+    L_INT_SELECT    = "#00ADFB"   # Selected/Pressed State
+    L_BORDER        = "#E3E5E8"   # Subtle borders
     
     # --- Light Theme Palette ---
     L_BG_MAIN       = "#F2F2F2"   # Main window background
@@ -564,6 +570,17 @@ class Style:
                 margin: 1px 0;
             }}
         '''
+        
+        frequency_big_stable = f'''
+            QLabel {{
+                font-size: 24px;
+                font-weight: bold;
+                color: {Palette.STATUS_GREEN};
+                letter-spacing: 0px;
+                padding: 5px;
+                margin: 1px 0;
+            }}
+        '''
 
     class Scroll:
         transparent = '''
@@ -605,3 +622,55 @@ class Style:
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0px; }
             QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; }
         '''
+        
+        
+    class List:
+        dark = f"""
+            QListWidget {{
+                background-color: {Palette.D_BG_FRAME_1};  /* #2F3136 */
+                color: {Palette.D_TEXT_SEC};            /* #B9BBBE */
+                border: none;
+                font-size: {Palette.FONT_SIZE_L};
+                padding-top: 10px;
+                outline: none; /* Removes dotted line on focus */
+            }}
+            QListWidget::item {{
+                height: 40px;
+                padding-left: 10px;
+                margin: 2px 10px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {Palette.D_INT_SELECT};  /* #40444B */
+                color: {Palette.D_TEXT_MAIN};             /* #FFFFFF */
+            }}
+            QListWidget::item:hover {{
+                background-color: {Palette.D_INT_HOVER};   /* #36393F */
+                color: {Palette.D_TEXT_SEC};              /* #DCDDDE equiv */
+            }}
+        """
+
+        light = f"""
+            QListWidget {{
+                background-color: {Palette.L_BG_FRAME_1};
+                color: {Palette.L_TEXT_SEC};
+                border: none;
+                font-size: {Palette.FONT_SIZE_L};
+                padding-top: 10px;
+                outline: none;
+            }}
+            QListWidget::item {{
+                height: 40px;
+                padding-left: 10px;
+                margin: 2px 10px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {Palette.L_INT_SELECT};
+                color: #ffffff;
+            }}
+            QListWidget::item:hover {{
+                background-color: {Palette.L_INT_HOVER};
+                color: {Palette.L_TEXT_MAIN};
+            }}
+        """
