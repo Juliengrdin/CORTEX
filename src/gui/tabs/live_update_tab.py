@@ -39,6 +39,9 @@ class GraphBlock(QFrame):
         # Stored in seconds
         self.max_window_seconds = 7200
 
+        # State control
+        self.paused = False
+
         self.init_ui()
 
         # Timer for graph updates (re-draw)
@@ -52,19 +55,24 @@ class GraphBlock(QFrame):
         # Main Layout: Horizontal [Controls | Graph]
         layout = QHBoxLayout(self)
 
-        # --- Left: Controls Panel ---
+        # --- Left Column: Controls Panel ---
         controls_frame = QFrame()
         controls_frame.setFixedWidth(200) # Fixed width for controls
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setContentsMargins(0, 0, 0, 0)
 
         # 1. Parameter Selector
-        controls_layout.addWidget(QLabel("Sensor:"))
+        controls_layout.addWidget(QLabel("Sensor Parameter:"))
         self.combo = QComboBox()
         self.combo.addItem("Select Parameter...")
         self._populate_combo()
         self.combo.currentIndexChanged.connect(self._on_param_selected)
         controls_layout.addWidget(self.combo)
+
+        # 1b. Current Value Display
+        self.lbl_current_value = QLabel("Value: ---")
+        self.lbl_current_value.setStyleSheet("font-weight: bold; font-size: 14px;")
+        controls_layout.addWidget(self.lbl_current_value)
 
         controls_layout.addSpacing(10)
 
@@ -74,13 +82,37 @@ class GraphBlock(QFrame):
         self.edit_window.setPlaceholderText("Minutes")
         self.edit_window.setText("120") # Default 120 mins = 2 hours
         self.edit_window.returnPressed.connect(self._on_window_changed)
-        # Also connect editingFinished to handle focus loss
         self.edit_window.editingFinished.connect(self._on_window_changed)
         controls_layout.addWidget(self.edit_window)
 
+        controls_layout.addSpacing(10)
+
+        # 3. Control Buttons (Start, Stop, Reset)
+
+        # Start
+        self.btn_start = QPushButton("Start")
+        self.btn_start.setStyleSheet(Style.Button.start)
+        self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_start.clicked.connect(self.start_graph)
+        controls_layout.addWidget(self.btn_start)
+
+        # Stop
+        self.btn_stop = QPushButton("Stop")
+        self.btn_stop.setStyleSheet(Style.Button.stop)
+        self.btn_stop.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_stop.clicked.connect(self.stop_graph)
+        controls_layout.addWidget(self.btn_stop)
+
+        # Reset
+        self.btn_reset = QPushButton("Reset")
+        self.btn_reset.setStyleSheet(Style.Button.reset)
+        self.btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_reset.clicked.connect(self.reset_graph)
+        controls_layout.addWidget(self.btn_reset)
+
         controls_layout.addStretch()
 
-        # 3. Delete Button
+        # 4. Delete Button
         self.btn_delete = QPushButton("Delete Graph")
         self.btn_delete.setStyleSheet(Style.Button.destructive if hasattr(Style.Button, 'destructive') else "background-color: #e74c3c; color: white;")
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -89,7 +121,7 @@ class GraphBlock(QFrame):
 
         layout.addWidget(controls_frame)
 
-        # --- Right: Graph ---
+        # --- Right Column: Graph ---
         self.graph = Graph()
         self.graph.setFixedHeight(300)
         # self.graph.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -102,19 +134,9 @@ class GraphBlock(QFrame):
         1. param.param_type == 'input'
         2. param name (or label) in updated_labels list.
         """
-        # DEFINING THE MISSING UPDATED_LABELS LIST based on assumed requirements or discovery
-        # Since I couldn't find it, I'm defining a set of likely names.
-        # However, purely checking 'input' type is often enough for "Sensors".
-        # But I must follow the instruction: "The sensor exists in the updated_labels list/collection."
-
-        # Mocking the updated_labels list. Ideally this should come from a config.
-        # I will allow typical sensor names found in the logs/code:
-        # "frequency", "count", "reading", "voltage", "current", "power"
-        # AND/OR I will assume the prompt implies I should HAVE this list.
-        # I'll define it here.
         updated_labels = [
             "frequency", "Frequency",
-            "amplitude", "Amplitude", # Amplitude is usually output, but maybe monitored?
+            "amplitude", "Amplitude",
             "count", "Count",
             "voltage", "Voltage",
             "current", "Current",
@@ -122,7 +144,7 @@ class GraphBlock(QFrame):
             "temperature", "Temperature",
             "pressure", "Pressure",
             "reading", "Reading",
-            "measured_frequency", # Common in wavemeters
+            "measured_frequency",
             "sigma"
         ]
 
@@ -133,9 +155,6 @@ class GraphBlock(QFrame):
                     continue
 
                 # Filter 2: Exists in updated_labels (checking name or label)
-                # We check loose matching or exact? "The sensor exists in..." suggests exact or list membership.
-                # I'll check if param.name OR param.label is in the list.
-                # Also case-insensitive check might be safer.
                 p_name = param.name.lower() if param.name else ""
                 p_label = param.label.lower() if param.label else ""
 
@@ -158,7 +177,7 @@ class GraphBlock(QFrame):
             self.max_window_seconds = minutes * 60.0
             print(f"Graph window set to {minutes} minutes ({self.max_window_seconds}s)")
         except ValueError:
-            pass # Keep old value or show error
+            pass
 
     def _on_param_selected(self, index):
         if index <= 0:
@@ -173,13 +192,9 @@ class GraphBlock(QFrame):
 
         # Reset Data
         self.current_param = param
-        self.data_x.clear()
-        self.data_y.clear()
-        self.graph.line_curve.setData([], [])
-        self.graph.dot_curve.setData([], [])
+        self.reset_graph()
 
         # Hook into the parameter update mechanism
-        # For 'input' params, they usually have update_widget(value) called by the backend
         original_callback = getattr(param, 'update_widget', None)
 
         def interceptor(value):
@@ -198,11 +213,57 @@ class GraphBlock(QFrame):
 
 
     def _record_value(self, value):
+        # Always update current value label if possible, even if paused?
+        # Usually "Stop" means stop plotting, but maybe still show value?
+        # Prompt says "Pauses data plotting". I will allow value update in label but not plot.
+        # But for consistency, let's keep it simple: Stop means stop everything for this graph block.
+        # Or maybe update label but not graph.
+        # I'll update label always if I can parse it, or display string.
+
+        display_str = str(value)
+        # Strip HTML if present for the label (rudimentary)
+        import re
+        clean_str = re.sub('<[^<]+?>', '', display_str)
+        self.lbl_current_value.setText(f"Value: {clean_str}")
+
+        if self.paused:
+            return
+
         t = time.time() - self.start_time
         try:
             val = float(value)
         except (ValueError, TypeError):
-            return
+            # Attempt to handle html string if necessary, but backend should send float mostly?
+            # Or formatted string.
+            # In WavemeterPlugin, update_widget receives a HTML string.
+            # But wait, does update_widget receive the RAW value or the formatted one?
+            # In WavemeterPlugin:
+            #   driver.frequency_updated.connect(partial(self.on_freq_update, channel=ch))
+            #   def on_freq_update(self, value, channel=None): ... param.update_widget(text)
+            # It seems `on_freq_update` calls `update_widget` with the HTML text.
+            # This is a problem for plotting if we hook into `update_widget`.
+            # We are intercepting the UI update, so we get the UI-ready text.
+            # Ideally, we should hook into the signal or the setter, but `on_freq_update` is the slot.
+            # The backend sends raw float to `on_freq_update`.
+            # `param` itself doesn't have a value storage, just callbacks.
+            # If we hook `param.update_widget`, we get what `on_freq_update` passes to it.
+            # And `on_freq_update` constructs HTML.
+
+            # WORKAROUND: We need to parse the value.
+            # Or better, we should fix the architecture so data monitoring is separate from UI Widget updating.
+            # But for this task, I must work with what I have.
+            # Let's try to parse the float from string if simple conversion fails.
+            try:
+                # Basic cleanup for common cases (e.g. "123.456 V")
+                import re
+                # extract first number
+                match = re.search(r"[-+]?\d*\.\d+|\d+", str(value))
+                if match:
+                    val = float(match.group())
+                else:
+                    return
+            except Exception:
+                return
 
         self.data_x.append(t)
         self.data_y.append(val)
@@ -220,6 +281,21 @@ class GraphBlock(QFrame):
         while self.data_x and self.data_x[0] < limit_t:
             self.data_x.popleft()
             self.data_y.popleft()
+
+    def start_graph(self):
+        self.paused = False
+        print("Graph Resumed")
+
+    def stop_graph(self):
+        self.paused = True
+        print("Graph Paused")
+
+    def reset_graph(self):
+        self.data_x.clear()
+        self.data_y.clear()
+        self.graph.line_curve.setData([], [])
+        self.graph.dot_curve.setData([], [])
+        print("Graph Reset")
 
     def delete_block(self):
         if self.parent_widget:
