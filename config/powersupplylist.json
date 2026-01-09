@@ -1,26 +1,6 @@
 [
-  {
-    "name": "Rigol Rack Top",
-    "id": "RIGOLPS",
-    "serialnumber": "0000",
-    "ip": "192.168.1.208"
-  },
-  {
-    "name": "Rigol Rack Bottom",
-    "id": "RIGOLPS",
-    "serialnumber": "0001",
-    "ip": "192.168.1.209"
-  },
-  {
-    "name": "Rigol Laser Lab",
-    "id": "RIGOLPS",
-    "serialnumber": "0002",
-    "ip": "192.168.1.210"
-  },
-  {
-    "name": "Unity LaserLab",
-    "id": "UNITYPS",
-    "serialnumber": "0003",
-    "ip": "192.168.1.211"
-  }
+    {"name": "Rigol Rack Top", "id": "RIGOLPS", "serialnumber": "0000"},
+    {"name": "Rigol Rack Bottom", "id": "RIGOLPS", "serialnumber": "0001"},
+    {"name": "Rigol Laser Lab", "id": "RIGOLPS", "serialnumber": "0002"},
+    {"name": "Unity LaserLab", "id": "UNITYPS", "serialnumber": "0003"}
 ]

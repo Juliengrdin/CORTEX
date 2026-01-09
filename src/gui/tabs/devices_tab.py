@@ -22,7 +22,12 @@ from PyQt6.QtWidgets import (
 )
 
 # --- Local Imports ---
-import InitializeCortex
+# Assuming this file is now in src/gui/tabs/
+# and imports should be adjusted relative to the root if PYTHONPATH is set correctly,
+# or relative to this file.
+# The original builder.py used absolute imports starting with 'src.'.
+# We should keep using absolute imports if possible.
+
 from src.gui.assets.csstyle import Style
 from src.gui.assets.instrument_base import InstrumentBase, Parameter
 from src.gui.widgets.smaller_toggle import AnimatedToggle
@@ -56,9 +61,6 @@ def configure_mqtt_environment():
         sys.modules["paho.mqtt.client"] = mock_mqtt
         mock_mqtt.client = mock_mqtt
         print(">> [System] WARNING: Running with MOCK MQTT Environment")
-
-# Run setup immediately
-configure_mqtt_environment()
 
 
 # ==============================================================================
@@ -152,7 +154,7 @@ class InstrumentFrame(QFrame):
             widget.setStyleSheet(Style.Label.frequency_big)
             parent_layout.addWidget(widget)
             if hasattr(param, 'update_widget'):
-                 param.update_widget = widget.setText
+                 param.update_widget_rich = widget.setText
             if hasattr(param, 'update_widget_style'):
                  param.update_widget_style = widget.setStyleSheet
             return widget
@@ -213,7 +215,11 @@ class InstrumentPanel(QWidget):
 
         # 3. Load & Organize Instruments
         if not devices_path:
-            devices_path = os.path.join(os.path.dirname(__file__), "devices")
+            # We need to find the devices directory relative to THIS file or absolute.
+            # Original code: devices_path = os.path.join(os.path.dirname(__file__), "devices")
+            # If this file is in src/gui/tabs/devices_tab.py, then devices is in ../devices
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            devices_path = os.path.join(base_dir, "devices")
 
         self._load_and_display_plugins(devices_path)
 
@@ -305,24 +311,3 @@ class InstrumentPanel(QWidget):
                     print(f">> [Loader] Failed to load {filename}: {e}")
                     
         return loaded_instruments
-
-
-# ==============================================================================
-#   MAIN ENTRY POINT
-# ==============================================================================
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    
-    # Optional: Apply Global Theme
-    # app.setStyleSheet(Style.Default.light) 
-    
-    win = QMainWindow()
-    win.setWindowTitle("CORTEX Laboratory Dashboard")
-    win.resize(1200, 700) # Slightly larger default for new layout
-    
-    panel = InstrumentPanel()
-    win.setCentralWidget(panel)
-    
-    win.show()
-    sys.exit(app.exec())
