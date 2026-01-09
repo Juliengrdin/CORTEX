@@ -47,9 +47,10 @@ class MqttWavemeter(QObject):
         return getattr(self, 'frequency_value', 0.0)
 
     def set_setpoint(self, value: float):
-        # TODO: Implement MQTT publish for setpoint when topic is known
-        print(f"[{self.mqtt_path}] Set setpoint to {value}")
-        pass
+        # Deducing setpoint topic: HFWM/8731/frequency/X -> HFWM/8731/setpoint/X
+        topic = self.mqtt_path.replace("frequency", "setpoint")
+        print(f"[{self.mqtt_path}] Publishing setpoint {value} to {topic}")
+        self.client.publish(topic, str(value))
 
 
 if __name__ == "__main__":
